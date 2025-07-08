@@ -315,9 +315,9 @@ class IndependentVisualizationManager {
         this.currentAnalysisType = 'basic';
         this.selectedChartTypes = [];
         this.selectedColumns = [];
-        this.allColumns = {{ all_columns | tojsonfilter | safe }};
-        this.numericColumns = {{ numeric_columns | tojsonfilter | safe }};
-        this.categoricalColumns = {{ categorical_columns | tojsonfilter | safe }};
+        this.allColumns = {{ all_columns | tojson | safe }};
+        this.numericColumns = {{ numeric_columns | tojson | safe }};
+        this.categoricalColumns = {{ categorical_columns | tojson | safe }};
         this.charts = {};
         
         this.init();

@@ -48,10 +48,16 @@ def dashboard():
     try:
         datasets = Dataset.query.order_by(Dataset.upload_date.desc()).all()
         datasets_data = [dataset.to_dict() for dataset in datasets]
-        return render_template('analysis_dashboard.html', datasets=datasets_data)
+        
+        # Pass the first dataset as the default selected dataset
+        selected_dataset = datasets_data[0] if datasets_data else None
+        
+        return render_template('analysis_dashboard.html', 
+                             datasets=datasets_data,
+                             dataset=selected_dataset)
     except Exception as e:
         flash(f'Error loading dashboard: {str(e)}', 'error')
-        return render_template('analysis_dashboard.html', datasets=[])
+        return render_template('analysis_dashboard.html', datasets=[], dataset=None)
 
 @main_bp.route('/reports')
 def reports():
@@ -149,6 +155,24 @@ def download_report(dataset_id):
     except Exception as e:
         flash(f"Error downloading report: {str(e)}", 'error')
         return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/api/datasets')
+def get_datasets():
+    """API endpoint to get all datasets"""
+    try:
+        datasets = Dataset.query.order_by(Dataset.upload_date.desc()).all()
+        datasets_data = [dataset.to_dict() for dataset in datasets]
+        return jsonify({
+            'success': True,
+            'datasets': datasets_data,
+            'count': len(datasets_data)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'datasets': []
+        }), 500
 
 @main_bp.route('/delete_dataset/<int:dataset_id>')
 def delete_dataset(dataset_id):

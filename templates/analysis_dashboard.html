@@ -855,19 +855,31 @@ function generateCorrelations() {
     
     showLoading('Calculating correlations...');
     
-    fetch(`/analysis/api/correlations/${datasetId}`)
-        .then(response => response.json())
+    fetch(`/analysis/api/eda/${datasetId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             hideLoading();
             if (data.error) {
                 showAlert('danger', data.error);
             } else {
-                displayCorrelations(data);
+                displayCorrelations(data.correlation_analysis || data);
             }
         })
         .catch(error => {
             hideLoading();
+            console.error('Correlation error:', error);
             showAlert('danger', 'Error calculating correlations: ' + error.message);
+            
+            // Display error in correlations container
+            displayCorrelations({
+                error: error.message,
+                details: 'Please check that your dataset has numeric columns for correlation analysis.'
+            });
         });
 }
 
@@ -876,6 +888,18 @@ function displayCorrelations(data) {
     
     if (!data || typeof data !== 'object') {
         container.innerHTML = '<div class="alert alert-warning">No correlation data available</div>';
+        return;
+    }
+    
+    // Handle error case
+    if (data.error) {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Error calculating correlations:</strong> ${data.error}
+                ${data.details ? `<br><small>${data.details}</small>` : ''}
+            </div>
+        `;
         return;
     }
     

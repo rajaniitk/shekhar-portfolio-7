@@ -6,6 +6,8 @@ from services.data_processor import DataProcessor
 from services.eda_engine import EDAEngine
 from services.insights_generator import InsightsGenerator
 from app import db
+from datetime import datetime
+from models import ModelTraining
 
 analysis_bp = Blueprint('analysis', __name__)
 
@@ -361,3 +363,363 @@ def column_action(dataset_id):
     except Exception as e:
         logging.error(f"Column action error: {str(e)}")
         return jsonify({'error': str(e), 'success': False}), 500
+
+@analysis_bp.route('/api/compare', methods=['POST'])
+def compare_datasets():
+    """Compare two datasets using various analysis methods"""
+    try:
+        data = request.get_json()
+        
+        primary_dataset_id = data.get('primary_dataset_id')
+        secondary_dataset_id = data.get('secondary_dataset_id')
+        comparison_type = data.get('comparison_type', 'columns')
+        column_mappings = data.get('column_mappings', [])
+        options = data.get('options', {})
+        
+        if not primary_dataset_id or not secondary_dataset_id:
+            return jsonify({'success': False, 'error': 'Both dataset IDs are required'}), 400
+        
+        # Get datasets
+        primary_dataset = Dataset.query.get_or_404(primary_dataset_id)
+        secondary_dataset = Dataset.query.get_or_404(secondary_dataset_id)
+        
+        # Load data
+        processor = DataProcessor()
+        primary_df, _ = processor.load_file(primary_dataset.file_path)
+        secondary_df, _ = processor.load_file(secondary_dataset.file_path)
+        
+        if primary_df is None or secondary_df is None:
+            return jsonify({'success': False, 'error': 'Could not load dataset files'}), 500
+        
+        # Perform comparison based on type
+        comparison_results = {}
+        
+        if comparison_type == 'columns':
+            comparison_results = perform_column_comparison(primary_df, secondary_df, primary_dataset, secondary_dataset)
+        elif comparison_type == 'statistical':
+            comparison_results = perform_statistical_comparison(primary_df, secondary_df, column_mappings)
+        elif comparison_type == 'distribution':
+            comparison_results = perform_distribution_comparison(primary_df, secondary_df, column_mappings)
+        elif comparison_type == 'models':
+            comparison_results = perform_model_comparison(primary_dataset_id, secondary_dataset_id)
+        
+        # Add visualizations if requested
+        if options.get('include_visualizations', True):
+            comparison_results['visualizations'] = generate_comparison_visualizations(
+                primary_df, secondary_df, comparison_type, column_mappings
+            )
+        
+        return jsonify({
+            'success': True,
+            'results': comparison_results,
+            'metadata': {
+                'primary_dataset': primary_dataset.to_dict(),
+                'secondary_dataset': secondary_dataset.to_dict(),
+                'comparison_type': comparison_type,
+                'generated_at': datetime.utcnow().isoformat()
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Dataset comparison error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def perform_column_comparison(primary_df, secondary_df, primary_dataset, secondary_dataset):
+    """Perform column-wise comparison between datasets"""
+    results = {
+        'overview': {
+            'primary': {
+                'rows': len(primary_df),
+                'columns': len(primary_df.columns),
+                'memory_mb': primary_df.memory_usage(deep=True).sum() / 1024 / 1024,
+                'missing_percentage': (primary_df.isnull().sum().sum() / (len(primary_df) * len(primary_df.columns))) * 100,
+                'duplicates': primary_df.duplicated().sum()
+            },
+            'secondary': {
+                'rows': len(secondary_df),
+                'columns': len(secondary_df.columns),
+                'memory_mb': secondary_df.memory_usage(deep=True).sum() / 1024 / 1024,
+                'missing_percentage': (secondary_df.isnull().sum().sum() / (len(secondary_df) * len(secondary_df.columns))) * 100,
+                'duplicates': secondary_df.duplicated().sum()
+            }
+        },
+        'column_comparison': {},
+        'common_columns': [],
+        'unique_columns': {
+            'primary': [],
+            'secondary': []
+        }
+    }
+    
+    # Find common and unique columns
+    primary_cols = set(primary_df.columns)
+    secondary_cols = set(secondary_df.columns)
+    
+    results['common_columns'] = list(primary_cols.intersection(secondary_cols))
+    results['unique_columns']['primary'] = list(primary_cols - secondary_cols)
+    results['unique_columns']['secondary'] = list(secondary_cols - primary_cols)
+    
+    # Compare common columns
+    for col in results['common_columns']:
+        if col in primary_df.columns and col in secondary_df.columns:
+            results['column_comparison'][col] = compare_single_column(primary_df[col], secondary_df[col])
+    
+    return results
+
+def compare_single_column(primary_col, secondary_col):
+    """Compare two columns and return comparison metrics"""
+    comparison = {
+        'data_types': {
+            'primary': str(primary_col.dtype),
+            'secondary': str(secondary_col.dtype),
+            'compatible': str(primary_col.dtype) == str(secondary_col.dtype)
+        },
+        'basic_stats': {}
+    }
+    
+    # Basic statistics comparison
+    if primary_col.dtype in ['int64', 'float64'] and secondary_col.dtype in ['int64', 'float64']:
+        comparison['basic_stats'] = {
+            'primary': {
+                'mean': float(primary_col.mean()) if not primary_col.empty else None,
+                'median': float(primary_col.median()) if not primary_col.empty else None,
+                'std': float(primary_col.std()) if not primary_col.empty else None,
+                'min': float(primary_col.min()) if not primary_col.empty else None,
+                'max': float(primary_col.max()) if not primary_col.empty else None
+            },
+            'secondary': {
+                'mean': float(secondary_col.mean()) if not secondary_col.empty else None,
+                'median': float(secondary_col.median()) if not secondary_col.empty else None,
+                'std': float(secondary_col.std()) if not secondary_col.empty else None,
+                'min': float(secondary_col.min()) if not secondary_col.empty else None,
+                'max': float(secondary_col.max()) if not secondary_col.empty else None
+            }
+        }
+    
+    # Missing values comparison
+    comparison['missing_values'] = {
+        'primary': {
+            'count': int(primary_col.isnull().sum()),
+            'percentage': float((primary_col.isnull().sum() / len(primary_col)) * 100)
+        },
+        'secondary': {
+            'count': int(secondary_col.isnull().sum()),
+            'percentage': float((secondary_col.isnull().sum() / len(secondary_col)) * 100)
+        }
+    }
+    
+    # Unique values comparison
+    comparison['unique_values'] = {
+        'primary': int(primary_col.nunique()),
+        'secondary': int(secondary_col.nunique())
+    }
+    
+    return comparison
+
+def perform_statistical_comparison(primary_df, secondary_df, column_mappings):
+    """Perform statistical tests between datasets"""
+    from scipy import stats
+    import numpy as np
+    
+    results = {
+        'tests_performed': [],
+        'summary': {
+            'total_tests': 0,
+            'significant_results': 0,
+            'confidence_level': 0.95
+        }
+    }
+    
+    # If no column mappings provided, compare common numeric columns
+    if not column_mappings:
+        common_numeric_cols = []
+        for col in primary_df.columns:
+            if (col in secondary_df.columns and 
+                primary_df[col].dtype in ['int64', 'float64'] and 
+                secondary_df[col].dtype in ['int64', 'float64']):
+                common_numeric_cols.append(col)
+                column_mappings.append({'primary': col, 'secondary': col})
+    
+    for mapping in column_mappings:
+        primary_col = mapping['primary']
+        secondary_col = mapping['secondary']
+        
+        if (primary_col in primary_df.columns and secondary_col in secondary_df.columns):
+            primary_data = primary_df[primary_col].dropna()
+            secondary_data = secondary_df[secondary_col].dropna()
+            
+            if len(primary_data) > 0 and len(secondary_data) > 0:
+                # Perform various statistical tests
+                test_results = {}
+                
+                # T-test (if both are numeric)
+                if (primary_data.dtype in ['int64', 'float64'] and 
+                    secondary_data.dtype in ['int64', 'float64']):
+                    try:
+                        t_stat, p_value = stats.ttest_ind(primary_data, secondary_data)
+                        test_results['t_test'] = {
+                            'statistic': float(t_stat),
+                            'p_value': float(p_value),
+                            'significant': p_value < 0.05,
+                            'interpretation': 'Means are significantly different' if p_value < 0.05 else 'No significant difference in means'
+                        }
+                    except:
+                        pass
+                    
+                    # Mann-Whitney U test
+                    try:
+                        u_stat, p_value = stats.mannwhitneyu(primary_data, secondary_data, alternative='two-sided')
+                        test_results['mann_whitney'] = {
+                            'statistic': float(u_stat),
+                            'p_value': float(p_value),
+                            'significant': p_value < 0.05,
+                            'interpretation': 'Distributions are significantly different' if p_value < 0.05 else 'No significant difference in distributions'
+                        }
+                    except:
+                        pass
+                    
+                    # Kolmogorov-Smirnov test
+                    try:
+                        ks_stat, p_value = stats.ks_2samp(primary_data, secondary_data)
+                        test_results['kolmogorov_smirnov'] = {
+                            'statistic': float(ks_stat),
+                            'p_value': float(p_value),
+                            'significant': p_value < 0.05,
+                            'interpretation': 'Distributions are significantly different' if p_value < 0.05 else 'No significant difference in distributions'
+                        }
+                    except:
+                        pass
+                
+                if test_results:
+                    results['tests_performed'].append({
+                        'columns': f"{primary_col} vs {secondary_col}",
+                        'tests': test_results
+                    })
+                    
+                    # Update summary
+                    results['summary']['total_tests'] += len(test_results)
+                    for test_name, test_result in test_results.items():
+                        if test_result.get('significant', False):
+                            results['summary']['significant_results'] += 1
+    
+    return results
+
+def perform_distribution_comparison(primary_df, secondary_df, column_mappings):
+    """Compare distributions between datasets"""
+    results = {
+        'distribution_metrics': {},
+        'normality_tests': {},
+        'summary': {}
+    }
+    
+    # If no column mappings, use common numeric columns
+    if not column_mappings:
+        for col in primary_df.columns:
+            if (col in secondary_df.columns and 
+                primary_df[col].dtype in ['int64', 'float64'] and 
+                secondary_df[col].dtype in ['int64', 'float64']):
+                column_mappings.append({'primary': col, 'secondary': col})
+    
+    for mapping in column_mappings:
+        primary_col = mapping['primary']
+        secondary_col = mapping['secondary']
+        
+        if (primary_col in primary_df.columns and secondary_col in secondary_df.columns):
+            primary_data = primary_df[primary_col].dropna()
+            secondary_data = secondary_df[secondary_col].dropna()
+            
+            if (len(primary_data) > 0 and len(secondary_data) > 0 and
+                primary_data.dtype in ['int64', 'float64'] and 
+                secondary_data.dtype in ['int64', 'float64']):
+                
+                # Calculate distribution metrics
+                results['distribution_metrics'][f"{primary_col}_vs_{secondary_col}"] = {
+                    'primary': {
+                        'mean': float(primary_data.mean()),
+                        'median': float(primary_data.median()),
+                        'std': float(primary_data.std()),
+                        'skewness': float(primary_data.skew()),
+                        'kurtosis': float(primary_data.kurtosis()),
+                        'q25': float(primary_data.quantile(0.25)),
+                        'q75': float(primary_data.quantile(0.75))
+                    },
+                    'secondary': {
+                        'mean': float(secondary_data.mean()),
+                        'median': float(secondary_data.median()),
+                        'std': float(secondary_data.std()),
+                        'skewness': float(secondary_data.skew()),
+                        'kurtosis': float(secondary_data.kurtosis()),
+                        'q25': float(secondary_data.quantile(0.25)),
+                        'q75': float(secondary_data.quantile(0.75))
+                    }
+                }
+    
+    return results
+
+def perform_model_comparison(primary_dataset_id, secondary_dataset_id):
+    """Compare ML model performance between datasets"""
+    results = {
+        'models_compared': [],
+        'performance_metrics': {},
+        'summary': {}
+    }
+    
+    # Get models for both datasets
+    primary_models = ModelTraining.query.filter_by(dataset_id=primary_dataset_id).all()
+    secondary_models = ModelTraining.query.filter_by(dataset_id=secondary_dataset_id).all()
+    
+    results['models_compared'] = {
+        'primary_dataset_models': len(primary_models),
+        'secondary_dataset_models': len(secondary_models)
+    }
+    
+    # Compare model performance
+    for primary_model in primary_models:
+        primary_metrics = primary_model.get_performance_metrics()
+        
+        for secondary_model in secondary_models:
+            if primary_model.model_type == secondary_model.model_type:
+                secondary_metrics = secondary_model.get_performance_metrics()
+                
+                comparison_key = f"{primary_model.model_type}_{primary_model.id}_vs_{secondary_model.id}"
+                results['performance_metrics'][comparison_key] = {
+                    'model_type': primary_model.model_type,
+                    'primary_performance': primary_metrics,
+                    'secondary_performance': secondary_metrics
+                }
+    
+    return results
+
+def generate_comparison_visualizations(primary_df, secondary_df, comparison_type, column_mappings):
+    """Generate visualizations for dataset comparison"""
+    visualizations = {}
+    
+    try:
+        from services.visualization_engine import VisualizationEngine
+        viz_engine = VisualizationEngine()
+        
+        # Create comparison plots based on type
+        if comparison_type == 'columns' and column_mappings:
+            for mapping in column_mappings[:3]:  # Limit to first 3 mappings
+                primary_col = mapping['primary']
+                secondary_col = mapping['secondary']
+                
+                if (primary_col in primary_df.columns and secondary_col in secondary_df.columns):
+                    # Create side-by-side comparison plots
+                    comparison_data = {
+                        'primary': primary_df[primary_col].dropna(),
+                        'secondary': secondary_df[secondary_col].dropna()
+                    }
+                    
+                    viz_key = f"comparison_{primary_col}_vs_{secondary_col}"
+                    visualizations[viz_key] = {
+                        'type': 'comparison_plot',
+                        'data': comparison_data,
+                        'title': f'Comparison: {primary_col} vs {secondary_col}'
+                    }
+        
+        return visualizations
+        
+    except Exception as e:
+        logging.warning(f"Could not generate comparison visualizations: {str(e)}")
+        return {}

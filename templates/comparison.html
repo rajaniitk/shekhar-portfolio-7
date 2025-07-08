@@ -253,19 +253,38 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadAvailableDatasets() {
-    // Simulate loading datasets
-    const datasets = [
-        { id: 1, name: "Sales_Data_2023.csv", rows: 1500 },
-        { id: 2, name: "Customer_Data.xlsx", rows: 2300 },
-        { id: 3, name: "Product_Analysis.json", rows: 890 }
-    ];
-    
+    // Load actual datasets from database
+    fetch('/api/datasets')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.datasets) {
+                populateDatasetSelectors(data.datasets);
+            } else {
+                // Fallback to template datasets if API fails
+                const datasets = {{ datasets | tojson | safe }};
+                populateDatasetSelectors(datasets);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading datasets:', error);
+            // Use template datasets as fallback
+            const datasets = {{ datasets | tojson | safe }};
+            populateDatasetSelectors(datasets);
+        });
+}
+
+function populateDatasetSelectors(datasets) {
     const primarySelect = document.getElementById('primary-dataset');
     const secondarySelect = document.getElementById('secondary-dataset');
     
+    // Clear existing options
+    primarySelect.innerHTML = '<option value="">Select dataset...</option>';
+    secondarySelect.innerHTML = '<option value="">Select dataset...</option>';
+    
     datasets.forEach(dataset => {
-        const option1 = new Option(`${dataset.name} (${dataset.rows} rows)`, dataset.id);
-        const option2 = new Option(`${dataset.name} (${dataset.rows} rows)`, dataset.id);
+        const displayName = `${dataset.filename} (${dataset.shape_rows || 'Unknown'} rows)`;
+        const option1 = new Option(displayName, dataset.id);
+        const option2 = new Option(displayName, dataset.id);
         
         primarySelect.add(option1);
         secondarySelect.add(option2);
@@ -330,14 +349,345 @@ function runComparison() {
     
     showLoading('Running comparison analysis...');
     
-    // Simulate comparison process
-    setTimeout(() => {
+    // Get column mappings
+    const columnMappings = [];
+    const columnPairs = document.querySelectorAll('#column-pairs .row');
+    columnPairs.forEach(pair => {
+        const primaryCol = pair.querySelector('select:first-child').value;
+        const secondaryCol = pair.querySelector('select:last-child').value;
+        if (primaryCol && secondaryCol) {
+            columnMappings.push({
+                primary: primaryCol,
+                secondary: secondaryCol
+            });
+        }
+    });
+    
+    // Get comparison options
+    const includeVisualizations = document.getElementById('include-visualizations').checked;
+    const includeStatisticalTests = document.getElementById('statistical-tests').checked;
+    const detailedReport = document.getElementById('detailed-report').checked;
+    
+    const requestData = {
+        primary_dataset_id: parseInt(primaryDataset),
+        secondary_dataset_id: parseInt(secondaryDataset),
+        comparison_type: comparisonType,
+        column_mappings: columnMappings,
+        options: {
+            include_visualizations: includeVisualizations,
+            include_statistical_tests: includeStatisticalTests,
+            detailed_report: detailedReport
+        }
+    };
+    
+    // Call real comparison API
+    fetch('/analysis/api/compare', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
         hideLoading();
-        displayComparisonResults(comparisonType);
-        showAlert('success', 'Comparison analysis completed successfully!');
-    }, 3000);
+        if (data.success) {
+            displayRealComparisonResults(data.results);
+            showAlert('success', 'Comparison analysis completed successfully!');
+        } else {
+            showAlert('error', data.error || 'Error running comparison analysis');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Comparison error:', error);
+        showAlert('error', 'Network error: ' + error.message);
+    });
 }
 
+function displayRealComparisonResults(results) {
+    const container = document.getElementById('comparison-results');
+    
+    let html = `
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Comparison Analysis Complete!</strong>
+                    Real comparison analysis has been performed.
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (results.overview) {
+        html += generateRealColumnComparisonResults(results);
+    } else if (results.tests_performed) {
+        html += generateRealStatisticalComparisonResults(results);
+    } else if (results.distribution_metrics) {
+        html += generateRealDistributionComparisonResults(results);
+    } else if (results.models_compared) {
+        html += generateRealModelComparisonResults(results);
+    }
+    
+    container.innerHTML = html;
+    
+    // Store results globally for export
+    comparisonResults = results;
+}
+
+function generateRealColumnComparisonResults(results) {
+    const overview = results.overview;
+    
+    return `
+        <div class="row">
+            <div class="col-lg-6 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-table me-2"></i>Dataset Overview</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Primary</th>
+                                    <th>Secondary</th>
+                                    <th>Difference</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Rows</td>
+                                    <td>${overview.primary.rows.toLocaleString()}</td>
+                                    <td>${overview.secondary.rows.toLocaleString()}</td>
+                                    <td class="${overview.secondary.rows > overview.primary.rows ? 'text-success' : 'text-warning'}">
+                                        ${((overview.secondary.rows - overview.primary.rows) / overview.primary.rows * 100).toFixed(1)}%
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Columns</td>
+                                    <td>${overview.primary.columns}</td>
+                                    <td>${overview.secondary.columns}</td>
+                                    <td class="${overview.secondary.columns > overview.primary.columns ? 'text-info' : 'text-warning'}">
+                                        ${((overview.secondary.columns - overview.primary.columns) / overview.primary.columns * 100).toFixed(1)}%
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Missing Values</td>
+                                    <td>${overview.primary.missing_percentage.toFixed(1)}%</td>
+                                    <td>${overview.secondary.missing_percentage.toFixed(1)}%</td>
+                                    <td class="${overview.secondary.missing_percentage < overview.primary.missing_percentage ? 'text-success' : 'text-danger'}">
+                                        ${(overview.secondary.missing_percentage - overview.primary.missing_percentage).toFixed(1)}%
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Duplicates</td>
+                                    <td>${overview.primary.duplicates}</td>
+                                    <td>${overview.secondary.duplicates}</td>
+                                    <td class="${overview.secondary.duplicates < overview.primary.duplicates ? 'text-success' : 'text-warning'}">
+                                        ${overview.secondary.duplicates - overview.primary.duplicates}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-columns me-2"></i>Column Summary</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Common Columns</small>
+                            <div class="h4 text-success">${results.common_columns?.length || 0}</div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Primary Only</small>
+                            <div class="h4 text-info">${results.unique_columns?.primary?.length || 0}</div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Secondary Only</small>
+                            <div class="h4 text-warning">${results.unique_columns?.secondary?.length || 0}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function generateRealStatisticalComparisonResults(results) {
+    const summary = results.summary;
+    
+    let html = `
+        <div class="row">
+            <div class="col-lg-8 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-calculator me-2"></i>Statistical Test Results</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Columns</th>
+                                        <th>Test</th>
+                                        <th>Statistic</th>
+                                        <th>P-value</th>
+                                        <th>Result</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+    `;
+    
+    results.tests_performed?.forEach(testGroup => {
+        Object.keys(testGroup.tests).forEach(testName => {
+            const test = testGroup.tests[testName];
+            html += `
+                <tr>
+                    <td>${testGroup.columns}</td>
+                    <td>${testName.replace('_', '-').toUpperCase()}</td>
+                    <td>${test.statistic.toFixed(4)}</td>
+                    <td>${test.p_value.toFixed(6)}</td>
+                    <td><span class="badge bg-${test.significant ? 'success' : 'secondary'}">
+                        ${test.significant ? 'Significant' : 'Not Significant'}
+                    </span></td>
+                </tr>
+            `;
+        });
+    });
+    
+    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Summary</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Tests Performed</small>
+                            <div class="h4 text-primary">${summary.total_tests}</div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Significant Results</small>
+                            <div class="h4 text-success">${summary.significant_results}</div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Confidence Level</small>
+                            <div class="h4 text-info">${(summary.confidence_level * 100).toFixed(0)}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+function generateRealDistributionComparisonResults(results) {
+    let html = `
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-chart-area me-2"></i>Distribution Comparison</h6>
+                    </div>
+                    <div class="card-body">
+    `;
+    
+    Object.keys(results.distribution_metrics).forEach(comparison => {
+        const metrics = results.distribution_metrics[comparison];
+        html += `
+            <h6>${comparison.replace('_vs_', ' vs ')}</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-dark table-sm">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Primary</th>
+                                <th>Secondary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Mean</td>
+                                <td>${metrics.primary.mean.toFixed(2)}</td>
+                                <td>${metrics.secondary.mean.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Median</td>
+                                <td>${metrics.primary.median.toFixed(2)}</td>
+                                <td>${metrics.secondary.median.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Std Dev</td>
+                                <td>${metrics.primary.std.toFixed(2)}</td>
+                                <td>${metrics.secondary.std.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Skewness</td>
+                                <td>${metrics.primary.skewness.toFixed(3)}</td>
+                                <td>${metrics.secondary.skewness.toFixed(3)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <hr>
+        `;
+    });
+    
+    html += `
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+function generateRealModelComparisonResults(results) {
+    return `
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-robot me-2"></i>Model Performance Comparison</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>Primary Dataset Models: <span class="badge bg-info">${results.models_compared.primary_dataset_models}</span></p>
+                        <p>Secondary Dataset Models: <span class="badge bg-info">${results.models_compared.secondary_dataset_models}</span></p>
+                        
+                        ${Object.keys(results.performance_metrics).length > 0 ? 
+                            '<div class="table-responsive"><table class="table table-dark"><thead><tr><th>Model Type</th><th>Primary Performance</th><th>Secondary Performance</th></tr></thead><tbody>' +
+                            Object.keys(results.performance_metrics).map(key => {
+                                const metric = results.performance_metrics[key];
+                                return `<tr><td>${metric.model_type}</td><td>${JSON.stringify(metric.primary_performance).substring(0, 50)}...</td><td>${JSON.stringify(metric.secondary_performance).substring(0, 50)}...</td></tr>`;
+                            }).join('') +
+                            '</tbody></table></div>' :
+                            '<p class="text-muted">No comparable models found between the datasets.</p>'
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Keep the original function for backward compatibility
 function displayComparisonResults(comparisonType) {
     const container = document.getElementById('comparison-results');
     
