@@ -1,0 +1,869 @@
+{% extends "base.html" %}
+
+{% block title %}Data Visualization - {{ dataset.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.css">
+<style>
+    .visualization-container {
+        background: #1a1d23;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .chart-selector {
+        background: #2b3035;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .chart-container {
+        background: #2b3035;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 20px;
+        min-height: 400px;
+    }
+    
+    .column-selector {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #343a40;
+        border-radius: 4px;
+        padding: 10px;
+    }
+    
+    .chart-option {
+        background: #495057;
+        border: 1px solid #6c757d;
+        border-radius: 4px;
+        margin: 5px;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .chart-option:hover {
+        background: #5a6268;
+        border-color: #adb5bd;
+    }
+    
+    .chart-option.selected {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: white;
+    }
+    
+    .analysis-type-selector {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .analysis-type-btn {
+        padding: 8px 16px;
+        border: 1px solid #6c757d;
+        background: #495057;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .analysis-type-btn:hover {
+        background: #5a6268;
+    }
+    
+    .analysis-type-btn.active {
+        background: #198754;
+        border-color: #198754;
+    }
+    
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        border-radius: 6px;
+    }
+    
+    .chart-controls {
+        background: #343a40;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .custom-chart-builder {
+        background: #2b3035;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="fas fa-chart-line me-2"></i>Data Visualization</h2>
+                    <p class="text-muted mb-0">Dataset: <strong>{{ dataset.name }}</strong></p>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-outline-primary" onclick="showDataPreview()">
+                        <i class="fas fa-table me-2"></i>Data Preview
+                    </button>
+                    <button class="btn btn-outline-success" onclick="exportVisualizations()">
+                        <i class="fas fa-download me-2"></i>Export All
+                    </button>
+                    <a href="/analysis/dataset/{{ dataset.id }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Analysis
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dataset Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div id="dataset-info-container"></div>
+        </div>
+    </div>
+
+    <!-- Analysis Type Selector -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="chart-selector">
+                <h5><i class="fas fa-layer-group me-2"></i>Analysis Type</h5>
+                <div class="analysis-type-selector">
+                    <button class="analysis-type-btn active" data-type="basic" onclick="setAnalysisType('basic')">
+                        <i class="fas fa-chart-bar me-1"></i>Basic Charts
+                    </button>
+                    <button class="analysis-type-btn" data-type="univariate" onclick="setAnalysisType('univariate')">
+                        <i class="fas fa-chart-pie me-1"></i>Univariate
+                    </button>
+                    <button class="analysis-type-btn" data-type="bivariate" onclick="setAnalysisType('bivariate')">
+                        <i class="fas fa-project-diagram me-1"></i>Bivariate
+                    </button>
+                    <button class="analysis-type-btn" data-type="multivariate" onclick="setAnalysisType('multivariate')">
+                        <i class="fas fa-cube me-1"></i>Multivariate
+                    </button>
+                    <button class="analysis-type-btn" data-type="advanced" onclick="setAnalysisType('advanced')">
+                        <i class="fas fa-brain me-1"></i>Advanced
+                    </button>
+                    <button class="analysis-type-btn" data-type="custom" onclick="setAnalysisType('custom')">
+                        <i class="fas fa-tools me-1"></i>Custom
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Selection -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="chart-selector">
+                <h5><i class="fas fa-chart-area me-2"></i>Chart Types</h5>
+                <div id="chart-types-container">
+                    <!-- Chart types will be populated based on analysis type -->
+                </div>
+                <button class="btn btn-primary mt-3" onclick="generateSelectedCharts()">
+                    <i class="fas fa-play me-2"></i>Generate Charts
+                </button>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="chart-selector">
+                <h5><i class="fas fa-columns me-2"></i>Column Selection</h5>
+                <div class="column-selector" id="column-selector">
+                    <!-- Columns will be populated dynamically -->
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-outline-primary btn-sm" onclick="selectAllColumns()">Select All</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="clearColumnSelection()">Clear All</button>
+                    <button class="btn btn-outline-info btn-sm" onclick="selectNumericColumns()">Numeric Only</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Chart Builder -->
+    <div id="custom-chart-builder" class="row mb-4" style="display: none;">
+        <div class="col-12">
+            <div class="custom-chart-builder">
+                <h5><i class="fas fa-tools me-2"></i>Custom Chart Builder</h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">Chart Type</label>
+                        <select class="form-select" id="custom-chart-type" onchange="updateCustomChartOptions()">
+                            <option value="scatter">Scatter Plot</option>
+                            <option value="line">Line Chart</option>
+                            <option value="bar">Bar Chart</option>
+                            <option value="histogram">Histogram</option>
+                            <option value="box_plot">Box Plot</option>
+                            <option value="violin_plot">Violin Plot</option>
+                            <option value="heatmap">Heatmap</option>
+                            <option value="bubble">Bubble Chart</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">X Axis</label>
+                        <select class="form-select" id="custom-x-column">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="custom-y-container">
+                        <label class="form-label">Y Axis</label>
+                        <select class="form-select" id="custom-y-column">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="custom-color-container">
+                        <label class="form-label">Color By</label>
+                        <select class="form-select" id="custom-color-column">
+                            <option value="">None</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="custom-size-container" style="display: none;">
+                        <label class="form-label">Size By</label>
+                        <select class="form-select" id="custom-size-column">
+                            <option value="">None</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-success d-block" onclick="buildCustomChart()">
+                            <i class="fas fa-magic"></i> Build
+                        </button>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Chart Title</label>
+                        <input type="text" class="form-control" id="custom-chart-title" placeholder="Enter chart title">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">X Axis Label</label>
+                        <input type="text" class="form-control" id="custom-x-label" placeholder="X axis label">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Y Axis Label</label>
+                        <input type="text" class="form-control" id="custom-y-label" placeholder="Y axis label">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Display Area -->
+    <div class="row">
+        <div class="col-12">
+            <div id="charts-container">
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-chart-pie fa-3x mb-3"></i>
+                    <h5>Select analysis type and chart options to generate visualizations</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Preview Modal -->
+    <div class="modal fade" id="dataPreviewModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content bg-dark">
+                <div class="modal-header">
+                    <h5 class="modal-title">Data Preview</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="data-preview-container">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+<script>
+// Independent Visualization Dashboard JavaScript
+class IndependentVisualizationManager {
+    constructor() {
+        this.datasetId = {{ dataset.id }};
+        this.currentAnalysisType = 'basic';
+        this.selectedChartTypes = [];
+        this.selectedColumns = [];
+        this.allColumns = {{ all_columns | tojsonfilter | safe }};
+        this.numericColumns = {{ numeric_columns | tojsonfilter | safe }};
+        this.categoricalColumns = {{ categorical_columns | tojsonfilter | safe }};
+        this.charts = {};
+        
+        this.init();
+    }
+    
+    init() {
+        this.loadDatasetInfo();
+        this.populateColumns();
+        this.setAnalysisType('basic');
+        this.populateCustomChartColumns();
+    }
+    
+    async loadDatasetInfo() {
+        try {
+            const response = await fetch(`/analysis/api/column_details/${this.datasetId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayDatasetInfo(data);
+            }
+        } catch (error) {
+            console.error('Error loading dataset info:', error);
+        }
+    }
+    
+    displayDatasetInfo(data) {
+        const container = document.getElementById('dataset-info-container');
+        if (!container || !data.column_details) return;
+        
+        const numCols = this.numericColumns.length;
+        const catCols = this.categoricalColumns.length;
+        
+        container.innerHTML = `
+            <div class="card bg-dark border-info">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-primary">${data.dataset_shape[0]}</h4>
+                            <small class="text-muted">Rows</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-primary">${data.dataset_shape[1]}</h4>
+                            <small class="text-muted">Columns</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">${numCols}</h4>
+                            <small class="text-muted">Numeric</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">${catCols}</h4>
+                            <small class="text-muted">Categorical</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    populateColumns() {
+        const container = document.getElementById('column-selector');
+        if (!container) return;
+        
+        let html = '';
+        this.allColumns.forEach(column => {
+            const isNumeric = this.numericColumns.includes(column);
+            const badgeClass = isNumeric ? 'bg-success' : 'bg-warning';
+            const badgeText = isNumeric ? 'Numeric' : 'Categorical';
+            
+            html += `
+                <div class="form-check d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <input class="form-check-input" type="checkbox" value="${column}" 
+                               id="col_${column}" onchange="vizManager.updateColumnSelection()">
+                        <label class="form-check-label" for="col_${column}">
+                            ${column}
+                        </label>
+                    </div>
+                    <span class="badge ${badgeClass}">${badgeText}</span>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    populateCustomChartColumns() {
+        const xSelect = document.getElementById('custom-x-column');
+        const ySelect = document.getElementById('custom-y-column');
+        const colorSelect = document.getElementById('custom-color-column');
+        const sizeSelect = document.getElementById('custom-size-column');
+        
+        if (!xSelect) return;
+        
+        [xSelect, ySelect].forEach(select => {
+            select.innerHTML = '';
+            this.allColumns.forEach(col => {
+                select.innerHTML += `<option value="${col}">${col}</option>`;
+            });
+        });
+        
+        [colorSelect, sizeSelect].forEach(select => {
+            select.innerHTML = '<option value="">None</option>';
+            this.allColumns.forEach(col => {
+                select.innerHTML += `<option value="${col}">${col}</option>`;
+            });
+        });
+    }
+    
+    setAnalysisType(type) {
+        this.currentAnalysisType = type;
+        
+        // Update button states
+        document.querySelectorAll('.analysis-type-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-type="${type}"]`).classList.add('active');
+        
+        // Show/hide custom builder
+        const customBuilder = document.getElementById('custom-chart-builder');
+        if (customBuilder) {
+            customBuilder.style.display = type === 'custom' ? 'block' : 'none';
+        }
+        
+        this.populateChartTypes(type);
+    }
+    
+    populateChartTypes(analysisType) {
+        const container = document.getElementById('chart-types-container');
+        if (!container) return;
+        
+        const chartTypes = this.getChartTypesForAnalysis(analysisType);
+        
+        let html = '';
+        chartTypes.forEach(chart => {
+            html += `
+                <div class="chart-option" data-chart="${chart.type}" onclick="vizManager.toggleChartType('${chart.type}')">
+                    <i class="${chart.icon} me-2"></i>${chart.name}
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        this.selectedChartTypes = [];
+    }
+    
+    getChartTypesForAnalysis(type) {
+        const chartDefinitions = {
+            basic: [
+                { type: 'distribution_plots', name: 'Distribution Plots', icon: 'fas fa-chart-area' },
+                { type: 'box_plots', name: 'Box Plots', icon: 'fas fa-square' },
+                { type: 'bar_charts', name: 'Bar Charts', icon: 'fas fa-chart-bar' },
+                { type: 'pie_charts', name: 'Pie Charts', icon: 'fas fa-chart-pie' },
+                { type: 'correlation_heatmap', name: 'Correlation Heatmap', icon: 'fas fa-th' }
+            ],
+            univariate: [
+                { type: 'univariate_analysis', name: 'Distribution Analysis', icon: 'fas fa-chart-area' },
+                { type: 'violin_plots', name: 'Violin Plots', icon: 'fas fa-music' },
+                { type: 'qq_plots', name: 'Q-Q Plots', icon: 'fas fa-chart-line' }
+            ],
+            bivariate: [
+                { type: 'bivariate_analysis', name: 'Scatter Analysis', icon: 'fas fa-braille' },
+                { type: 'correlation_heatmap', name: 'Correlation Matrix', icon: 'fas fa-th' }
+            ],
+            multivariate: [
+                { type: 'multivariate_analysis', name: 'PCA Analysis', icon: 'fas fa-cube' },
+                { type: 'scatter_matrix', name: 'Scatter Matrix', icon: 'fas fa-th-large' },
+                { type: 'pairplot', name: 'Pair Plot', icon: 'fas fa-project-diagram' }
+            ],
+            advanced: [
+                { type: '3d_plots', name: '3D Visualizations', icon: 'fas fa-cube' },
+                { type: 'heatmaps', name: 'Advanced Heatmaps', icon: 'fas fa-fire' }
+            ]
+        };
+        
+        return chartDefinitions[type] || chartDefinitions.basic;
+    }
+    
+    toggleChartType(chartType) {
+        const element = document.querySelector(`[data-chart="${chartType}"]`);
+        
+        if (this.selectedChartTypes.includes(chartType)) {
+            this.selectedChartTypes = this.selectedChartTypes.filter(t => t !== chartType);
+            element.classList.remove('selected');
+        } else {
+            this.selectedChartTypes.push(chartType);
+            element.classList.add('selected');
+        }
+    }
+    
+    updateColumnSelection() {
+        this.selectedColumns = Array.from(document.querySelectorAll('#column-selector input:checked'))
+            .map(input => input.value);
+    }
+    
+    selectAllColumns() {
+        document.querySelectorAll('#column-selector input[type="checkbox"]').forEach(cb => {
+            cb.checked = true;
+        });
+        this.updateColumnSelection();
+    }
+    
+    clearColumnSelection() {
+        document.querySelectorAll('#column-selector input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+        this.updateColumnSelection();
+    }
+    
+    selectNumericColumns() {
+        document.querySelectorAll('#column-selector input[type="checkbox"]').forEach(cb => {
+            cb.checked = this.numericColumns.includes(cb.value);
+        });
+        this.updateColumnSelection();
+    }
+    
+    async generateSelectedCharts() {
+        if (this.selectedChartTypes.length === 0) {
+            showAlert('warning', 'Please select at least one chart type.');
+            return;
+        }
+        
+        showLoading('Generating visualizations...');
+        
+        try {
+            const params = new URLSearchParams();
+            this.selectedChartTypes.forEach(type => params.append('charts', type));
+            this.selectedColumns.forEach(col => params.append('columns', col));
+            
+            const response = await fetch(`/visualization/api/generate/${this.datasetId}?${params}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayCharts(data.visualizations);
+                showAlert('success', 'Visualizations generated successfully!');
+            } else {
+                showAlert('error', data.error || 'Error generating charts');
+            }
+        } catch (error) {
+            console.error('Visualization error:', error);
+            showAlert('error', 'Network error: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+    
+    displayCharts(data) {
+        const container = document.getElementById('charts-container');
+        if (!container) return;
+        
+        let html = '<div class="row">';
+        
+        Object.keys(data).forEach(chartType => {
+            const chartData = data[chartType];
+            
+            if (chartData && chartData.error) {
+                html += `
+                    <div class="col-12 mb-4">
+                        <div class="card bg-dark border-danger">
+                            <div class="card-header bg-danger">
+                                <h6 class="mb-0">${this.formatChartTypeName(chartType)}</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-danger">${chartData.error}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (chartData) {
+                html += this.createChartCard(chartType, chartData);
+            }
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Load chart visualizations
+        this.loadChartVisualizations(data);
+    }
+    
+    createChartCard(chartType, chartData) {
+        return `
+            <div class="col-lg-6 mb-4">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">${this.formatChartTypeName(chartType)}</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="vizManager.downloadChart('${chartType}')">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="vizManager.fullscreenChart('${chartType}')">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="chart-${chartType}" class="chart-container" style="min-height: 400px; position: relative;">
+                            <div class="loading-overlay">
+                                <div class="text-center text-white">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Rendering chart...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    formatChartTypeName(chartType) {
+        return chartType.replace(/_/g, ' ')
+                       .replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    loadChartVisualizations(data) {
+        Object.keys(data).forEach(chartType => {
+            const chartData = data[chartType];
+            const container = document.getElementById(`chart-${chartType}`);
+            
+            if (!container || !chartData || chartData.error) {
+                return;
+            }
+            
+            // Remove loading overlay
+            const loadingOverlay = container.querySelector('.loading-overlay');
+            if (loadingOverlay) {
+                loadingOverlay.remove();
+            }
+            
+            try {
+                if (chartData.type === 'plotly' && chartData.plot) {
+                    let plotData;
+                    if (typeof chartData.plot === 'string') {
+                        plotData = JSON.parse(chartData.plot);
+                    } else {
+                        plotData = chartData.plot;
+                    }
+                    
+                    const config = {
+                        responsive: true,
+                        displayModeBar: true,
+                        displaylogo: false
+                    };
+                    
+                    if (plotData.layout) {
+                        plotData.layout.paper_bgcolor = '#2b3035';
+                        plotData.layout.plot_bgcolor = '#2b3035';
+                        plotData.layout.font = { color: '#ffffff' };
+                    }
+                    
+                    Plotly.newPlot(container, plotData.data, plotData.layout, config);
+                    
+                } else if (chartData.type === 'image' && chartData.plot) {
+                    container.innerHTML = `
+                        <img src="data:image/png;base64,${chartData.plot}" 
+                             class="img-fluid" 
+                             alt="${chartType} chart"
+                             style="max-width: 100%; height: auto;">
+                    `;
+                    
+                } else {
+                    container.innerHTML = `
+                        <div class="alert alert-info">
+                            Chart generated successfully.
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error(`Error loading chart ${chartType}:`, error);
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        Error loading chart: ${error.message}
+                    </div>
+                `;
+            }
+        });
+    }
+    
+    downloadChart(chartType) {
+        // Implementation for chart download
+        showAlert('info', 'Download functionality will be implemented.');
+    }
+    
+    fullscreenChart(chartType) {
+        const chartContainer = document.getElementById(`chart-${chartType}`);
+        if (chartContainer && chartContainer.requestFullscreen) {
+            chartContainer.requestFullscreen();
+        }
+    }
+    
+    async buildCustomChart() {
+        const chartType = document.getElementById('custom-chart-type').value;
+        const xColumn = document.getElementById('custom-x-column').value;
+        const yColumn = document.getElementById('custom-y-column').value;
+        const colorColumn = document.getElementById('custom-color-column').value;
+        const sizeColumn = document.getElementById('custom-size-column').value;
+        const title = document.getElementById('custom-chart-title').value;
+        
+        if (!chartType || !xColumn) {
+            showAlert('warning', 'Please select chart type and X column.');
+            return;
+        }
+        
+        showLoading('Building custom chart...');
+        
+        try {
+            const chartConfig = {
+                chart_type: chartType,
+                x_column: xColumn,
+                y_column: yColumn,
+                color_column: colorColumn,
+                size_column: sizeColumn,
+                title: title
+            };
+            
+            const response = await fetch(`/visualization/api/custom/${this.datasetId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(chartConfig)
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Display custom chart
+                showAlert('success', 'Custom chart generated successfully!');
+            } else {
+                showAlert('error', data.error || 'Error generating custom chart');
+            }
+        } catch (error) {
+            showAlert('error', 'Network error: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+}
+
+// Global functions
+function setAnalysisType(type) {
+    vizManager.setAnalysisType(type);
+}
+
+function generateSelectedCharts() {
+    vizManager.generateSelectedCharts();
+}
+
+function selectAllColumns() {
+    vizManager.selectAllColumns();
+}
+
+function clearColumnSelection() {
+    vizManager.clearColumnSelection();
+}
+
+function selectNumericColumns() {
+    vizManager.selectNumericColumns();
+}
+
+function buildCustomChart() {
+    vizManager.buildCustomChart();
+}
+
+function updateCustomChartOptions() {
+    const chartType = document.getElementById('custom-chart-type').value;
+    const yContainer = document.getElementById('custom-y-container');
+    const colorContainer = document.getElementById('custom-color-container');
+    const sizeContainer = document.getElementById('custom-size-container');
+    
+    if (yContainer) {
+        yContainer.style.display = ['histogram', 'box_plot', 'violin_plot'].includes(chartType) ? 'none' : 'block';
+    }
+    
+    if (sizeContainer) {
+        sizeContainer.style.display = chartType === 'bubble' ? 'block' : 'none';
+    }
+}
+
+async function showDataPreview() {
+    const modal = new bootstrap.Modal(document.getElementById('dataPreviewModal'));
+    modal.show();
+    
+    try {
+        const response = await fetch(`/visualization/api/data/${vizManager.datasetId}?page=0&size=100`);
+        const data = await response.json();
+        
+        const container = document.getElementById('data-preview-container');
+        if (data.error) {
+            container.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        } else {
+            // Display data table
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-dark table-striped">
+                        <thead>
+                            <tr>
+            `;
+            
+            data.columns.forEach(col => {
+                html += `<th>${col}</th>`;
+            });
+            
+            html += `
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.data.forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => {
+                    html += `<td>${cell !== null ? cell : '<span class="text-muted">null</span>'}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+    } catch (error) {
+        document.getElementById('data-preview-container').innerHTML = 
+            `<div class="alert alert-danger">Error loading data: ${error.message}</div>`;
+    }
+}
+
+function exportVisualizations() {
+    showAlert('info', 'Export functionality will be implemented.');
+}
+
+// Initialize visualization manager
+let vizManager;
+document.addEventListener('DOMContentLoaded', function() {
+    vizManager = new IndependentVisualizationManager();
+});
+</script>
+{% endblock %}

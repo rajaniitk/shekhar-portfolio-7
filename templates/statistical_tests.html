@@ -1,0 +1,853 @@
+{% extends "base.html" %}
+
+{% block title %}Statistical Tests - EDA Pro{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Test Selection Sidebar -->
+    <div class="col-lg-3 mb-4">
+        <div class="card bg-dark border-primary sticky-top">
+            <div class="card-header bg-primary">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-calculator me-2"></i>Statistical Tests
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if dataset %}
+                    <div class="mb-3">
+                        <small class="text-muted">Dataset</small>
+                        <div class="text-primary">{{ dataset.filename }}</div>
+                    </div>
+                    
+                    <hr class="border-secondary">
+                    
+                    <!-- Test Categories -->
+                    <div class="accordion" id="test-categories">
+                        <!-- Normality Tests -->
+                        <div class="accordion-item bg-dark border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button bg-secondary text-light collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#normality-tests">
+                                    <i class="fas fa-chart-line me-2"></i>Normality Tests
+                                </button>
+                            </h2>
+                            <div id="normality-tests" class="accordion-collapse collapse" data-bs-parent="#test-categories">
+                                <div class="accordion-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="shapiro-wilk" value="shapiro_wilk">
+                                        <label class="form-check-label" for="shapiro-wilk">Shapiro-Wilk</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="kolmogorov-smirnov" value="kolmogorov_smirnov">
+                                        <label class="form-check-label" for="kolmogorov-smirnov">Kolmogorov-Smirnov</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="anderson-darling" value="anderson_darling">
+                                        <label class="form-check-label" for="anderson-darling">Anderson-Darling</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="jarque-bera" value="jarque_bera">
+                                        <label class="form-check-label" for="jarque-bera">Jarque-Bera</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Variance Tests -->
+                        <div class="accordion-item bg-dark border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button bg-secondary text-light collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#variance-tests">
+                                    <i class="fas fa-balance-scale me-2"></i>Variance Tests
+                                </button>
+                            </h2>
+                            <div id="variance-tests" class="accordion-collapse collapse" data-bs-parent="#test-categories">
+                                <div class="accordion-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="levene" value="levene">
+                                        <label class="form-check-label" for="levene">Levene's Test</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="bartlett" value="bartlett">
+                                        <label class="form-check-label" for="bartlett">Bartlett's Test</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="fligner" value="fligner">
+                                        <label class="form-check-label" for="fligner">Fligner-Killeen</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hypothesis Tests -->
+                        <div class="accordion-item bg-dark border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button bg-secondary text-light collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#hypothesis-tests">
+                                    <i class="fas fa-vial me-2"></i>Hypothesis Tests
+                                </button>
+                            </h2>
+                            <div id="hypothesis-tests" class="accordion-collapse collapse" data-bs-parent="#test-categories">
+                                <div class="accordion-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="ttest" value="ttest">
+                                        <label class="form-check-label" for="ttest">T-Tests</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="anova" value="anova">
+                                        <label class="form-check-label" for="anova">ANOVA</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="chi-square" value="chi_square">
+                                        <label class="form-check-label" for="chi-square">Chi-Square</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="mann-whitney" value="mann_whitney">
+                                        <label class="form-check-label" for="mann-whitney">Mann-Whitney U</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="wilcoxon" value="wilcoxon">
+                                        <label class="form-check-label" for="wilcoxon">Wilcoxon</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Correlation Tests -->
+                        <div class="accordion-item bg-dark border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button bg-secondary text-light collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#correlation-tests">
+                                    <i class="fas fa-project-diagram me-2"></i>Correlation Tests
+                                </button>
+                            </h2>
+                            <div id="correlation-tests" class="accordion-collapse collapse" data-bs-parent="#test-categories">
+                                <div class="accordion-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="pearson" value="pearson">
+                                        <label class="form-check-label" for="pearson">Pearson</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="spearman" value="spearman">
+                                        <label class="form-check-label" for="spearman">Spearman</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="kendall" value="kendall">
+                                        <label class="form-check-label" for="kendall">Kendall's Tau</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary">
+
+                    <!-- Column Selection -->
+                    <div class="mb-3">
+                        <label class="form-label">Select Columns</label>
+                        <select class="form-select bg-dark text-light border-secondary" id="column-select" multiple>
+                            {% if numeric_columns %}
+                                <optgroup label="Numeric Columns">
+                                    {% for col in numeric_columns %}
+                                        <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endif %}
+                            {% if categorical_columns %}
+                                <optgroup label="Categorical Columns">
+                                    {% for col in categorical_columns %}
+                                        <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <!-- Test Parameters -->
+                    <div class="mb-3">
+                        <label class="form-label">Significance Level (α)</label>
+                        <select class="form-select bg-dark text-light border-secondary" id="alpha-level">
+                            <option value="0.01">0.01</option>
+                            <option value="0.05" selected>0.05</option>
+                            <option value="0.10">0.10</option>
+                        </select>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="runSelectedTests()">
+                            <i class="fas fa-play me-1"></i>Run Selected Tests
+                        </button>
+                        <button class="btn btn-outline-success" onclick="runComprehensiveTests()">
+                            <i class="fas fa-magic me-1"></i>Comprehensive Analysis
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="exportTestResults()">
+                            <i class="fas fa-download me-1"></i>Export Results
+                        </button>
+                    </div>
+                {% else %}
+                    <div class="text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
+                        <p class="text-muted">No dataset selected</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Results -->
+    <div class="col-lg-9">
+        <div class="card bg-dark border-secondary">
+            <div class="card-header bg-secondary">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-flask me-2"></i>Statistical Test Results
+                        </h5>
+                    </div>
+                    <div class="col-auto">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-light" onclick="clearResults()">
+                                <i class="fas fa-trash me-1"></i>Clear
+                            </button>
+                            <button class="btn btn-outline-light" onclick="showTestComparison()">
+                                <i class="fas fa-balance-scale me-1"></i>Compare
+                            </button>
+                            <button class="btn btn-outline-light" onclick="generateTestReport()">
+                                <i class="fas fa-file-alt me-1"></i>Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="test-results">
+                    <div class="text-center py-5">
+                        <i class="fas fa-flask fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Ready for Statistical Testing</h5>
+                        <p class="text-muted">Select test types and columns, then click "Run Selected Tests"</p>
+                        
+                        <!-- Quick Start Guide -->
+                        <div class="row mt-4">
+                            <div class="col-md-6 offset-md-3">
+                                <div class="card bg-primary">
+                                    <div class="card-body">
+                                        <h6 class="text-white mb-3">Quick Start Guide</h6>
+                                        <div class="text-start text-white">
+                                            <p><i class="fas fa-check me-2"></i>Select test categories from the sidebar</p>
+                                            <p><i class="fas fa-check me-2"></i>Choose columns to analyze</p>
+                                            <p><i class="fas fa-check me-2"></i>Set significance level (α)</p>
+                                            <p class="mb-0"><i class="fas fa-check me-2"></i>Run tests and interpret results</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Comparison Modal -->
+<div class="modal fade" id="testComparisonModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="fas fa-balance-scale me-2"></i>Test Comparison
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="comparison-content">
+                <!-- Comparison content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Report Modal -->
+<div class="modal fade" id="testReportModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-alt me-2"></i>Statistical Test Report
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="report-content">
+                <!-- Report content will be loaded here -->
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-primary" onclick="downloadReport()">
+                    <i class="fas fa-download me-1"></i>Download Report
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const datasetId = {{ dataset.id if dataset else 'null' }};
+let testResults = {};
+
+function runSelectedTests() {
+    const selectedTests = getSelectedTests();
+    const selectedColumns = getSelectedColumns();
+    const alphaLevel = document.getElementById('alpha-level').value;
+    
+    if (selectedTests.length === 0) {
+        showAlert('warning', 'Please select at least one test category.');
+        return;
+    }
+    
+    if (selectedColumns.length === 0) {
+        showAlert('warning', 'Please select at least one column.');
+        return;
+    }
+    
+    showLoading('Running statistical tests...');
+    
+    // Run tests based on categories
+    const promises = [];
+    
+    if (selectedTests.includes('normality')) {
+        promises.push(runNormalityTests(selectedColumns));
+    }
+    
+    if (selectedTests.includes('variance')) {
+        promises.push(runVarianceTests(selectedColumns));
+    }
+    
+    if (selectedTests.includes('correlation')) {
+        promises.push(runCorrelationTests(selectedColumns));
+    }
+    
+    if (selectedTests.includes('hypothesis')) {
+        promises.push(runHypothesisTests(selectedColumns));
+    }
+    
+    Promise.all(promises)
+        .then(results => {
+            hideLoading();
+            displayTestResults(results);
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('danger', 'Error running tests: ' + error.message);
+        });
+}
+
+function getSelectedTests() {
+    const tests = [];
+    
+    // Check if any normality tests are selected
+    const normalityTests = ['shapiro-wilk', 'kolmogorov-smirnov', 'anderson-darling', 'jarque-bera'];
+    if (normalityTests.some(test => document.getElementById(test)?.checked)) {
+        tests.push('normality');
+    }
+    
+    // Check if any variance tests are selected
+    const varianceTests = ['levene', 'bartlett', 'fligner'];
+    if (varianceTests.some(test => document.getElementById(test)?.checked)) {
+        tests.push('variance');
+    }
+    
+    // Check if any correlation tests are selected
+    const correlationTests = ['pearson', 'spearman', 'kendall'];
+    if (correlationTests.some(test => document.getElementById(test)?.checked)) {
+        tests.push('correlation');
+    }
+    
+    // Check if any hypothesis tests are selected
+    const hypothesisTests = ['ttest', 'anova', 'chi-square', 'mann-whitney', 'wilcoxon'];
+    if (hypothesisTests.some(test => document.getElementById(test)?.checked)) {
+        tests.push('hypothesis');
+    }
+    
+    return tests;
+}
+
+function getSelectedColumns() {
+    const select = document.getElementById('column-select');
+    return Array.from(select.selectedOptions).map(option => option.value);
+}
+
+function runNormalityTests(columns) {
+    const params = new URLSearchParams();
+    columns.forEach(col => params.append('columns', col));
+    
+    return fetch(`/statistics/api/normality/${datasetId}?${params}`)
+        .then(response => response.json())
+        .then(data => ({ type: 'normality', data }));
+}
+
+function runVarianceTests(columns) {
+    const params = new URLSearchParams();
+    columns.forEach(col => params.append('groups', col));
+    
+    return fetch(`/statistics/api/variance/${datasetId}?${params}`)
+        .then(response => response.json())
+        .then(data => ({ type: 'variance', data }));
+}
+
+function runCorrelationTests(columns) {
+    if (columns.length < 2) {
+        return Promise.resolve({ type: 'correlation', data: { error: 'At least 2 columns required for correlation tests' } });
+    }
+    
+    const params = new URLSearchParams({
+        col1: columns[0],
+        col2: columns[1]
+    });
+    
+    return fetch(`/statistics/api/correlation/${datasetId}?${params}`)
+        .then(response => response.json())
+        .then(data => ({ type: 'correlation', data }));
+}
+
+function runHypothesisTests(columns) {
+    const params = new URLSearchParams({
+        test_type: 'ttest'
+    });
+    columns.forEach(col => params.append('groups', col));
+    
+    return fetch(`/statistics/api/hypothesis/${datasetId}?${params}`)
+        .then(response => response.json())
+        .then(data => ({ type: 'hypothesis', data }));
+}
+
+function runComprehensiveTests() {
+    if (!datasetId) return;
+    
+    showLoading('Running comprehensive statistical analysis...');
+    
+    fetch(`/statistics/api/comprehensive/${datasetId}`)
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.error) {
+                showAlert('danger', data.error);
+            } else {
+                testResults.comprehensive = data;
+                displayComprehensiveResults(data);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('danger', 'Error running comprehensive tests: ' + error.message);
+        });
+}
+
+function displayTestResults(results) {
+    const container = document.getElementById('test-results');
+    let html = '<div class="row">';
+    
+    results.forEach(result => {
+        const { type, data } = result;
+        
+        if (data.error) {
+            html += `
+                <div class="col-12 mb-3">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>${type.toUpperCase()}:</strong> ${data.error}
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        html += `
+            <div class="col-lg-6 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-${getTestIcon(type)} me-2"></i>
+                            ${type.replace('_', ' ').toUpperCase()} Tests
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        ${generateTestHTML(type, data)}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Store results for later use
+    results.forEach(result => {
+        testResults[result.type] = result.data;
+    });
+}
+
+function generateTestHTML(type, data) {
+    let html = '';
+    
+    if (!data || typeof data !== 'object') {
+        return '<p class="text-muted">No valid results available</p>';
+    }
+    
+    Object.keys(data).forEach(key => {
+        const testResult = data[key];
+        
+        // Handle different result formats
+        if (typeof testResult === 'object' && testResult !== null) {
+            // Check for various statistical test result formats
+            if (testResult.p_value !== undefined || testResult.pvalue !== undefined || 
+                testResult.correlation !== undefined || testResult.statistic !== undefined) {
+                
+                const pValue = testResult.p_value || testResult.pvalue;
+                const statistic = testResult.statistic || testResult.correlation || testResult.test_statistic;
+                const significant = pValue !== undefined ? pValue < 0.05 : false;
+                
+                html += `
+                    <div class="mb-3 p-3 border border-secondary rounded">
+                        <h6 class="text-primary">${formatTestName(key)}</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">Test Statistic:</small>
+                                <div class="fw-bold">${statistic !== undefined ? Number(statistic).toFixed(4) : 'N/A'}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">P-value:</small>
+                                <div class="fw-bold text-${significant ? 'success' : 'warning'}">
+                                    ${pValue !== undefined ? Number(pValue).toFixed(6) : 'N/A'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${pValue !== undefined ? `
+                            <div class="mt-2">
+                                <span class="badge bg-${significant ? 'success' : 'secondary'}">
+                                    ${significant ? 'Significant' : 'Not Significant'} (α = 0.05)
+                                </span>
+                            </div>
+                        ` : ''}
+                        
+                        ${testResult.interpretation ? `
+                            <div class="mt-2">
+                                <small class="text-muted">Interpretation:</small>
+                                <div class="text-light">${testResult.interpretation}</div>
+                            </div>
+                        ` : ''}
+                        
+                        ${testResult.critical_values ? `
+                            <div class="mt-2">
+                                <small class="text-muted">Critical Values:</small>
+                                <div class="text-light">${Array.isArray(testResult.critical_values) ? 
+                                    testResult.critical_values.map(v => Number(v).toFixed(4)).join(', ') : 
+                                    Number(testResult.critical_values).toFixed(4)}</div>
+                            </div>
+                        ` : ''}
+                        
+                        ${testResult.is_normal !== undefined ? `
+                            <div class="mt-2">
+                                <span class="badge bg-${testResult.is_normal ? 'success' : 'warning'}">
+                                    ${testResult.is_normal ? 'Normal Distribution' : 'Non-Normal Distribution'}
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else if (typeof testResult === 'object') {
+                // Handle nested objects (like for multiple columns)
+                html += `
+                    <div class="mb-3 p-3 border border-secondary rounded">
+                        <h6 class="text-primary">${formatTestName(key)}</h6>
+                        ${generateNestedTestHTML(testResult)}
+                    </div>
+                `;
+            }
+        }
+    });
+    
+    return html || '<p class="text-muted">No results available</p>';
+}
+
+function generateNestedTestHTML(data) {
+    let html = '';
+    
+    Object.keys(data).forEach(subKey => {
+        const subResult = data[subKey];
+        
+        if (typeof subResult === 'object' && subResult !== null) {
+            const pValue = subResult.p_value || subResult.pvalue;
+            const statistic = subResult.statistic || subResult.correlation || subResult.test_statistic;
+            const significant = pValue !== undefined ? pValue < 0.05 : false;
+            
+            html += `
+                <div class="mb-2 p-2 bg-dark rounded">
+                    <strong class="text-warning">${formatTestName(subKey)}:</strong>
+                    <div class="row mt-1">
+                        <div class="col-6">
+                            <small>Statistic: <span class="text-info">${statistic !== undefined ? Number(statistic).toFixed(4) : 'N/A'}</span></small>
+                        </div>
+                        <div class="col-6">
+                            <small>P-value: <span class="text-${significant ? 'success' : 'warning'}">${pValue !== undefined ? Number(pValue).toFixed(6) : 'N/A'}</span></small>
+                        </div>
+                    </div>
+                    ${pValue !== undefined ? `
+                        <span class="badge badge-sm bg-${significant ? 'success' : 'secondary'} mt-1">
+                            ${significant ? 'Significant' : 'Not Significant'}
+                        </span>
+                    ` : ''}
+                </div>
+            `;
+        }
+    });
+    
+    return html;
+}
+
+function formatTestName(name) {
+    return name.replace(/_/g, ' ')
+               .replace(/\b\w/g, l => l.toUpperCase())
+               .replace(/Ks/g, 'K-S')
+               .replace(/Qq/g, 'Q-Q');
+}
+
+function getTestIcon(type) {
+    const icons = {
+        'normality': 'chart-line',
+        'variance': 'balance-scale',
+        'correlation': 'project-diagram',
+        'hypothesis': 'vial'
+    };
+    return icons[type] || 'flask';
+}
+
+function displayComprehensiveResults(data) {
+    const container = document.getElementById('test-results');
+    
+    let html = `
+        <div class="row">
+            <div class="col-12 mb-3">
+                <h5><i class="fas fa-chart-bar me-2"></i>Comprehensive Statistical Analysis</h5>
+            </div>
+        </div>
+        <div class="row">
+    `;
+    
+    // Dataset Summary
+    if (data.dataset_summary) {
+        html += `
+            <div class="col-lg-4 mb-3">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Dataset Summary</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-dark table-sm">
+                            <tr><td>Total Columns</td><td>${data.dataset_summary.total_columns || 'N/A'}</td></tr>
+                            <tr><td>Numeric Columns</td><td>${data.dataset_summary.numeric_columns || 'N/A'}</td></tr>
+                            <tr><td>Categorical Columns</td><td>${data.dataset_summary.categorical_columns || 'N/A'}</td></tr>
+                            <tr><td>Total Rows</td><td>${data.dataset_summary.total_rows ? data.dataset_summary.total_rows.toLocaleString() : 'N/A'}</td></tr>
+                            <tr><td>Missing Data</td><td class="text-${(data.dataset_summary.missing_data_percentage || 0) > 10 ? 'warning' : 'success'}">${data.dataset_summary.missing_data_percentage ? data.dataset_summary.missing_data_percentage.toFixed(1) + '%' : 'N/A'}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Display all test results
+    Object.keys(data).forEach(category => {
+        if (category !== 'dataset_summary' && data[category] && typeof data[category] === 'object') {
+            html += `
+                <div class="col-lg-8 mb-3">
+                    <div class="card bg-secondary">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-${getTestIcon(category)} me-2"></i>${formatTestName(category)}</h6>
+                        </div>
+                        <div class="card-body">
+                            ${generateComprehensiveTestHTML(data[category])}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function generateComprehensiveTestHTML(data) {
+    let html = '';
+    
+    if (Array.isArray(data)) {
+        // Handle array format
+        data.forEach((item, index) => {
+            html += `<div class="mb-2"><strong>Item ${index + 1}:</strong> ${JSON.stringify(item)}</div>`;
+        });
+    } else if (typeof data === 'object') {
+        // Handle object format
+        Object.keys(data).forEach(key => {
+            const result = data[key];
+            
+            if (typeof result === 'object' && result !== null) {
+                html += `
+                    <div class="mb-3 p-2 border border-dark rounded">
+                        <strong class="text-info">${formatTestName(key)}:</strong>
+                        ${generateTestHTML('comprehensive', { [key]: result })}
+                    </div>
+                `;
+            } else {
+                html += `<div class="mb-1"><strong>${formatTestName(key)}:</strong> ${result}</div>`;
+            }
+        });
+    } else {
+        html = `<div class="text-muted">${data}</div>`;
+    }
+    
+    return html || '<p class="text-muted">No results available</p>';
+}
+
+function clearResults() {
+    document.getElementById('test-results').innerHTML = `
+        <div class="text-center py-5">
+            <i class="fas fa-flask fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Ready for Statistical Testing</h5>
+            <p class="text-muted">Select test types and columns, then click "Run Selected Tests"</p>
+        </div>
+    `;
+    testResults = {};
+}
+
+function showTestComparison() {
+    if (Object.keys(testResults).length === 0) {
+        showAlert('warning', 'No test results available for comparison.');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('testComparisonModal'));
+    modal.show();
+    
+    // Generate comparison content
+    generateComparisonContent();
+}
+
+function generateTestReport() {
+    if (Object.keys(testResults).length === 0) {
+        showAlert('warning', 'No test results available for report generation.');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('testReportModal'));
+    modal.show();
+    
+    // Generate report content
+    generateReportContent();
+}
+
+function exportTestResults() {
+    if (Object.keys(testResults).length === 0) {
+        showAlert('warning', 'No test results to export.');
+        return;
+    }
+    
+    const exportData = {
+        dataset_id: datasetId,
+        analysis_date: new Date().toISOString(),
+        test_results: testResults
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `statistical_tests_${datasetId}_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showAlert('success', 'Test results exported successfully.');
+}
+
+function generateComparisonContent() {
+    const content = document.getElementById('comparison-content');
+    
+    let html = '<div class="table-responsive"><table class="table table-dark"><thead><tr><th>Test Type</th><th>Results Count</th><th>Significant Results</th></tr></thead><tbody>';
+    
+    Object.keys(testResults).forEach(testType => {
+        const results = testResults[testType];
+        let totalTests = 0;
+        let significantTests = 0;
+        
+        if (typeof results === 'object') {
+            totalTests = Object.keys(results).length;
+            Object.values(results).forEach(result => {
+                if (typeof result === 'object' && (result.p_value < 0.05 || result.pvalue < 0.05)) {
+                    significantTests++;
+                }
+            });
+        }
+        
+        html += `<tr><td>${formatTestName(testType)}</td><td>${totalTests}</td><td>${significantTests}</td></tr>`;
+    });
+    
+    html += '</tbody></table></div>';
+    content.innerHTML = html;
+}
+
+function generateReportContent() {
+    const content = document.getElementById('report-content');
+    
+    let html = '<div class="mb-4"><h6>Statistical Analysis Report</h6>';
+    html += `<p class="text-muted">Generated on: ${new Date().toLocaleString()}</p></div>`;
+    
+    Object.keys(testResults).forEach(testType => {
+        html += `
+            <div class="mb-4">
+                <h6 class="text-primary">${formatTestName(testType)} Results</h6>
+                ${generateTestHTML(testType, testResults[testType])}
+            </div>
+        `;
+    });
+    
+    content.innerHTML = html;
+}
+
+function downloadReport() {
+    const reportContent = document.getElementById('report-content').innerHTML;
+    const blob = new Blob([`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Statistical Analysis Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .text-primary { color: #007bff; }
+                .text-success { color: #28a745; }
+                .text-warning { color: #ffc107; }
+                .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
+                .bg-success { background-color: #28a745; color: white; }
+                .bg-secondary { background-color: #6c757d; color: white; }
+            </style>
+        </head>
+        <body>
+            ${reportContent}
+        </body>
+        </html>
+    `], {type: 'text/html'});
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `statistical_report_${datasetId}_${new Date().toISOString().split('T')[0]}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showAlert('success', 'Report downloaded successfully.');
+}
+</script>
+{% endblock %}
