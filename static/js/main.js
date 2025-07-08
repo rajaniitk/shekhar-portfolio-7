@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
     setupEventListeners();
     checkForUpdates();
+    initializePage();
+    checkConnectivity();
+    
+    // Add a small delay to ensure everything is loaded
+    setTimeout(() => {
+        updateCurrentDatasetDisplay();
+    }, 500);
 });
 
 function initializeApp() {
@@ -575,85 +582,401 @@ function checkForUpdates() {
 
 // Navigation functions
 function showColumnAnalysis() {
-    const currentDatasetId = getCurrentDatasetId();
-    if (currentDatasetId) {
-        window.location.href = `/analysis/column/${currentDatasetId}`;
+    if (getCurrentDatasetId()) {
+        window.location.href = `/analysis/column/${getCurrentDatasetId()}`;
     } else {
-        showAlert('warning', 'Please select a dataset first.');
+        // Show dataset selector modal for column analysis
+        showDatasetSelectorModal('column_analysis');
     }
 }
 
 function showStatisticalTests() {
-    const currentDatasetId = getCurrentDatasetId();
-    if (currentDatasetId) {
-        window.location.href = `/statistics/${currentDatasetId}`;
+    if (getCurrentDatasetId()) {
+        window.location.href = `/statistics/${getCurrentDatasetId()}`;
     } else {
-        showAlert('warning', 'Please select a dataset first.');
+        // Show dataset selector modal for statistical tests
+        showDatasetSelectorModal('statistics');
     }
 }
 
 function showMLModels() {
-    const currentDatasetId = getCurrentDatasetId();
-    if (currentDatasetId) {
-        window.location.href = `/ml/${currentDatasetId}`;
+    if (getCurrentDatasetId()) {
+        window.location.href = `/ml/${getCurrentDatasetId()}`;
     } else {
-        showAlert('warning', 'Please select a dataset first.');
+        // Show dataset selector modal for ML models
+        showDatasetSelectorModal('ml_models');
     }
 }
 
 function showVisualization() {
-    const currentDatasetId = getCurrentDatasetId();
-    if (currentDatasetId) {
-        window.location.href = `/visualization/${currentDatasetId}`;
+    if (getCurrentDatasetId()) {
+        window.location.href = `/visualization/${getCurrentDatasetId()}`;
     } else {
-        showAlert('warning', 'Please select a dataset first.');
+        // Show dataset selector modal for visualizations
+        showDatasetSelectorModal('visualization');
     }
 }
 
 function showFeatureEngineering() {
-    const currentDatasetId = getCurrentDatasetId();
-    if (currentDatasetId) {
-        window.location.href = `/feature_engineering/${currentDatasetId}`;
+    if (getCurrentDatasetId()) {
+        window.location.href = `/feature-engineering/${getCurrentDatasetId()}`;
     } else {
-        showAlert('warning', 'Please select a dataset first.');
+        // Show dataset selector modal for feature engineering
+        showDatasetSelectorModal('feature_engineering');
     }
 }
 
+function showDatasetSelectorModal(targetPage) {
+    // Create and show dataset selector modal
+    const modalHtml = `
+        <div class="modal fade" id="datasetSelectorModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-dark">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title">
+                            <i class="fas fa-database me-2"></i>Select Dataset
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="dataset-list-container">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading datasets...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if present
+    const existingModal = document.getElementById('datasetSelectorModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('datasetSelectorModal'));
+    modal.show();
+    
+    // Load datasets
+    loadDatasetsForSelector(targetPage);
+}
+
+function loadDatasetsForSelector(targetPage) {
+    // Simulate API call to get datasets
+    setTimeout(() => {
+        const datasets = [
+            { id: 1, filename: "sales_data_2023.csv", rows: 1500, cols: 12 },
+            { id: 2, filename: "customer_analysis.xlsx", rows: 2300, cols: 15 },
+            { id: 3, filename: "marketing_data.json", rows: 890, cols: 8 }
+        ];
+        
+        const container = document.getElementById('dataset-list-container');
+        
+        if (datasets.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No datasets found</h5>
+                    <p class="text-muted">Please upload a dataset first.</p>
+                    <a href="/upload" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Upload Dataset
+                    </a>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div class="row">
+                <div class="col-12 mb-3">
+                    <h6 class="text-muted">Select a dataset for ${targetPage.replace('_', ' ')}:</h6>
+                </div>
+        `;
+        
+        datasets.forEach(dataset => {
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="card bg-secondary h-100 dataset-card" 
+                         onclick="selectDataset(${dataset.id}, '${targetPage}')" 
+                         style="cursor: pointer;">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <i class="fas fa-file-csv me-2 text-primary"></i>
+                                ${dataset.filename}
+                            </h6>
+                            <p class="card-text text-muted small">
+                                ${dataset.rows} rows × ${dataset.cols} columns
+                            </p>
+                            <div class="text-end">
+                                <span class="badge bg-primary">Select</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Add hover effects
+        const datasetCards = document.querySelectorAll('.dataset-card');
+        datasetCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.02)';
+                this.style.transition = 'transform 0.2s ease';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'scale(1)';
+            });
+        });
+        
+    }, 1000);
+}
+
+function selectDataset(datasetId, targetPage) {
+    // Set current dataset
+    setCurrentDatasetId(datasetId);
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('datasetSelectorModal'));
+    if (modal) {
+        modal.hide();
+    }
+    
+    // Navigate to target page
+    const pageUrls = {
+        'column_analysis': `/analysis/column/${datasetId}`,
+        'statistics': `/statistics/${datasetId}`,
+        'ml_models': `/ml/${datasetId}`,
+        'visualization': `/visualization/${datasetId}`,
+        'feature_engineering': `/feature-engineering/${datasetId}`
+    };
+    
+    const url = pageUrls[targetPage];
+    if (url) {
+        showLoading(`Loading ${targetPage.replace('_', ' ')}...`);
+        window.location.href = url;
+    } else {
+        showAlert('error', 'Invalid page selected');
+    }
+}
+
+// Enhanced dataset management functions
 function getCurrentDatasetId() {
-    // Try to get dataset ID from URL path
+    // Check if dataset ID is in URL
     const pathParts = window.location.pathname.split('/');
-    for (let i = 0; i < pathParts.length; i++) {
-        if (!isNaN(parseInt(pathParts[i]))) {
-            return parseInt(pathParts[i]);
+    const datasetIndex = pathParts.findIndex(part => part === 'dataset' || part === 'analysis' || part === 'statistics' || part === 'ml' || part === 'visualization' || part === 'feature-engineering');
+    
+    if (datasetIndex !== -1 && pathParts[datasetIndex + 1]) {
+        const id = parseInt(pathParts[datasetIndex + 1]);
+        if (!isNaN(id)) {
+            currentDatasetId = id;
+            return id;
         }
     }
     
-    // Try to get from global variable
-    if (typeof currentDatasetId !== 'undefined' && currentDatasetId) {
+    // Check localStorage
+    const storedId = localStorage.getItem('currentDatasetId');
+    if (storedId) {
+        currentDatasetId = parseInt(storedId);
         return currentDatasetId;
     }
     
-    // Try to get from local storage
-    const storedDatasetId = localStorage.getItem('currentDatasetId');
-    if (storedDatasetId && !isNaN(parseInt(storedDatasetId))) {
-        return parseInt(storedDatasetId);
+    // Check session storage
+    const sessionId = sessionStorage.getItem('currentDatasetId');
+    if (sessionId) {
+        currentDatasetId = parseInt(sessionId);
+        return currentDatasetId;
     }
     
     return null;
 }
 
 function setCurrentDatasetId(datasetId) {
-    window.currentDatasetId = datasetId;
-    localStorage.setItem('currentDatasetId', datasetId);
+    currentDatasetId = datasetId;
+    localStorage.setItem('currentDatasetId', datasetId.toString());
+    sessionStorage.setItem('currentDatasetId', datasetId.toString());
     
-    // Update visualization and other managers
-    if (typeof visualizationManager !== 'undefined') {
-        visualizationManager.setDatasetId(datasetId);
-    }
-    if (typeof dataTableManager !== 'undefined') {
-        dataTableManager.setDatasetId(datasetId);
+    // Update UI elements that show current dataset
+    updateCurrentDatasetDisplay();
+}
+
+function updateCurrentDatasetDisplay() {
+    // Update any UI elements that show the current dataset
+    const datasetDisplays = document.querySelectorAll('.current-dataset-display');
+    datasetDisplays.forEach(display => {
+        if (currentDatasetId) {
+            display.textContent = `Dataset ID: ${currentDatasetId}`;
+            display.classList.remove('d-none');
+        } else {
+            display.classList.add('d-none');
+        }
+    });
+}
+
+// Enhanced navigation functions
+function navigateToPage(page, datasetId = null) {
+    const id = datasetId || getCurrentDatasetId();
+    
+    const routes = {
+        'dashboard': '/',
+        'upload': '/upload',
+        'analysis': id ? `/analysis/dataset/${id}` : '/analysis',
+        'column_analysis': id ? `/analysis/column/${id}` : '/analysis',
+        'comparison': '/analysis/comparison',
+        'statistics': id ? `/statistics/${id}` : '/statistics',
+        'visualization': id ? `/visualization/${id}` : '/visualization',
+        'ml_models': id ? `/ml/${id}` : '/ml',
+        'feature_engineering': id ? `/feature-engineering/${id}` : '/feature-engineering',
+        'advanced_feature_engineering': '/feature-engineering/advanced',
+        'reports': '/reports'
+    };
+    
+    const url = routes[page];
+    if (url) {
+        if (url.includes('undefined') || (!id && page !== 'dashboard' && page !== 'upload' && page !== 'comparison' && page !== 'advanced_feature_engineering' && page !== 'reports')) {
+            showDatasetSelectorModal(page);
+        } else {
+            window.location.href = url;
+        }
+    } else {
+        showAlert('error', `Unknown page: ${page}`);
     }
 }
+
+// Enhanced error handling
+function handleNavigationError(error) {
+    console.error('Navigation error:', error);
+    showAlert('error', 'Navigation failed. Please try again.');
+}
+
+// Enhanced page initialization
+function initializePage() {
+    // Detect current page and initialize accordingly
+    const path = window.location.pathname;
+    
+    if (path.includes('/analysis/')) {
+        initializeAnalysisPage();
+    } else if (path.includes('/visualization/')) {
+        initializeVisualizationPage();
+    } else if (path.includes('/statistics/')) {
+        initializeStatisticsPage();
+    } else if (path.includes('/ml/')) {
+        initializeMLPage();
+    } else if (path.includes('/feature-engineering/')) {
+        initializeFeatureEngineeringPage();
+    } else if (path === '/' || path === '/dashboard') {
+        initializeDashboardPage();
+    }
+    
+    // Update current dataset display
+    updateCurrentDatasetDisplay();
+}
+
+function initializeAnalysisPage() {
+    console.log('Initializing analysis page');
+    // Add analysis-specific initialization
+}
+
+function initializeVisualizationPage() {
+    console.log('Initializing visualization page');
+    // Add visualization-specific initialization
+}
+
+function initializeStatisticsPage() {
+    console.log('Initializing statistics page');
+    // Add statistics-specific initialization
+}
+
+function initializeMLPage() {
+    console.log('Initializing ML page');
+    // Add ML-specific initialization
+}
+
+function initializeFeatureEngineeringPage() {
+    console.log('Initializing feature engineering page');
+    // Add feature engineering-specific initialization
+}
+
+function initializeDashboardPage() {
+    console.log('Initializing dashboard page');
+    // Add dashboard-specific initialization
+}
+
+// Enhanced connectivity check
+function checkConnectivity() {
+    // Check if all required resources are loaded
+    const requiredResources = [
+        'bootstrap',
+        'Chart',
+        'Plotly'
+    ];
+    
+    const missingResources = requiredResources.filter(resource => {
+        return typeof window[resource] === 'undefined';
+    });
+    
+    if (missingResources.length > 0) {
+        console.warn('Missing resources:', missingResources);
+        showAlert('warning', `Some features may not work properly. Missing: ${missingResources.join(', ')}`);
+    }
+    
+    // Check backend connectivity
+    fetch('/api/health-check', { method: 'HEAD' })
+        .then(response => {
+            if (response.ok) {
+                console.log('Backend connectivity: OK');
+            } else {
+                throw new Error('Backend not responding');
+            }
+        })
+        .catch(error => {
+            console.warn('Backend connectivity issue:', error);
+            showAlert('warning', 'Some features may be limited due to connectivity issues.');
+        });
+}
+
+// Add page-specific enhancements
+function enhanceCurrentPage() {
+    // Add interactive elements
+    const interactiveElements = document.querySelectorAll('.interactive-hover');
+    interactiveElements.forEach(element => {
+        element.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.05)';
+            this.style.transition = 'transform 0.3s ease';
+        });
+        
+        element.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+    
+    // Add pulse animation to important buttons
+    const pulseButtons = document.querySelectorAll('.pulse-on-hover');
+    pulseButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.classList.add('pulse');
+        });
+        
+        button.addEventListener('mouseleave', function() {
+            this.classList.remove('pulse');
+        });
+    });
+}
+
+// Call enhancement function after page load
+window.addEventListener('load', enhanceCurrentPage);
 
 // Enhanced dataset loading with proper ID management
 function loadDatasetForAnalysis(datasetId) {

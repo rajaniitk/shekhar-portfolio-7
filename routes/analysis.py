@@ -9,6 +9,18 @@ from app import db
 
 analysis_bp = Blueprint('analysis', __name__)
 
+@analysis_bp.route('/comparison')
+def comparison_page():
+    """Data comparison analysis page"""
+    try:
+        datasets = Dataset.query.order_by(Dataset.upload_date.desc()).all()
+        datasets_data = [dataset.to_dict() for dataset in datasets]
+        return render_template('comparison.html', datasets=datasets_data)
+    except Exception as e:
+        logging.error(f"Comparison page error: {str(e)}")
+        flash(f'Error loading comparison page: {str(e)}', 'error')
+        return redirect(url_for('main.index'))
+
 @analysis_bp.route('/dataset/<int:dataset_id>')
 def dataset_overview(dataset_id):
     """Dataset overview and basic EDA"""

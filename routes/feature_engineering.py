@@ -1,11 +1,23 @@
 import logging
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from models import Dataset
 from services.data_processor import DataProcessor
 from services.feature_engineer import FeatureEngineer
 from app import db
 
 feature_engineering_bp = Blueprint('feature_engineering', __name__)
+
+@feature_engineering_bp.route('/advanced')
+def advanced_feature_engineering():
+    """Advanced feature engineering page"""
+    try:
+        datasets = Dataset.query.order_by(Dataset.upload_date.desc()).all()
+        datasets_data = [dataset.to_dict() for dataset in datasets]
+        return render_template('feature_engineering.html', datasets=datasets_data)
+    except Exception as e:
+        logging.error(f"Advanced feature engineering page error: {str(e)}")
+        flash(f'Error loading advanced feature engineering page: {str(e)}', 'error')
+        return redirect(url_for('main.index'))
 
 @feature_engineering_bp.route('/<int:dataset_id>')
 def feature_engineering_dashboard(dataset_id):
